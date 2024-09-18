@@ -1,0 +1,105 @@
+# Build Folders
+bin/
+obj/
+
+# Visual Studio Files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Auto-generated files
+Generated_Code/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Rider/JetBrains IDE Files
+.idea/
+*.sln.iml
+
+# ReSharper files
+_ReSharper*/
+*.DotSettings.user
+
+# ASP.NET temporary files
+wwwroot/
+**/wwwroot/**
+.vscode/
+
+# ASP.NET core environment variables
+.env
+
+# Rider project files
+.idea/
+
+# Windows image file caches
+*.png
+
+# Package Folders
+*.nupkg
+*.snupkg
+packages/
+*.dSYM/
+*.d.ts
+
+# Auto-generated UI files
+*.designer.cs
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# Dotnet tools
+.dotnet_tool/
+
+# Entity Framework migrations
+Migrations/
+
+# Coverage and profiling results
+coverage/
+*.coverage
+*.coveragexml
+*.testlog
+
+# User-specific files
+*.rsuser
+*.usr
+*.rsuser
+*.userprefs
+
+# Secrets and sensitive data
+secrets.json
+appsettings*.json
+appsettings.*.json
+
+# Rider files
+.idea/
+
+# Azure functions local settings file
+local.settings.json
+
+# Docker files
+docker-compose.override.yml
+.docker/
+
+# Node modules (for projects using JavaScript/TypeScript)
+node_modules/
+
+# JetBrains Rider cache
+.idea/
+.idea_modules/
+*/.idea_modules/
+*.sln.iml
+
+# Backup files
+*.bak
+
+# Ignore Test Results
+TestResults/

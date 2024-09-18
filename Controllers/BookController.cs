@@ -1,6 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using AutoMapper;
+using BookProject.DTO;
+using BookProject.Interface;
+using BookProject.Model;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 
 namespace BookProject.Controllers
 {
@@ -8,18 +13,14 @@ namespace BookProject.Controllers
     [ApiController]
     public class BookController : ControllerBase
     {
-        private static readonly List<Book> Books = new List<Book>
-        {
-            new Book {isbn = "12345", title = "book1", author = "a1", pages = 412},
-            new Book {isbn = "23456", title = "book2", author = "a1", pages = 441, description = "history book"},
-            new Book {isbn = "123141", title = "book3", author = "a2", pages = 121},
-        };
 
         private readonly ILogger<BookController> _logger;
+        private readonly IBookService _bookService;
 
-        public BookController(ILogger<BookController> logger)
+        public BookController(ILogger<BookController> logger, IBookService bookService)
         {
             _logger = logger;
+            _bookService = bookService;
         }
 
         /// <summary>
@@ -27,11 +28,10 @@ namespace BookProject.Controllers
         /// </summary>
         /// <response code="200">All books returned successfully.</response>
         [HttpGet(Name = "GetAllBooks")]
-        public IEnumerable<Book> GetAllBooks()
+        public async Task<ActionResult<IEnumerable<Book>>> GetAllBooks()
         {
-            //var allBooks = Books.Select(b => b);
-            //return allBooks;
-            return Books;
+            var books = await _bookService.GetAllBooks();
+            return Ok(books);
         }
 
         /// <summary>
@@ -41,12 +41,12 @@ namespace BookProject.Controllers
         /// <response code="200">The book was found and return successfully.</response>
         /// <response code="404">Book with given title was not found.</response>
         [HttpGet("title/{title}", Name ="GetBookByTitle")]
-        public ActionResult<Book> GetBookByTitle(string title)
+        public async Task<ActionResult<BookDTO>> GetBookByTitle(String title)
         {
-            var book = Books.FirstOrDefault(b => b.title.Equals(title, StringComparison.OrdinalIgnoreCase));
+            var book = await _bookService.GetBookByTitle(title);
             if (book == null)
             {
-                return NotFound(new ErrorResponse { Message = "Book Not Found"});
+                return NotFound(new ErrorResponse { Message = "Book Not Found" });
             }
             return Ok(book);
         }
@@ -58,17 +58,14 @@ namespace BookProject.Controllers
         /// <response code="200">The books were found and return successfully.</response>
         /// <response code="404">Books with given author was not found.</response>
         [HttpGet("author/{author}", Name = "GetBookByAuthor")]
-        public ActionResult<IEnumerable<Book>> GetBookByAuthor(String author)
+        public async Task<ActionResult<IEnumerable<BookDTO>>> GetBookByAuthor(string author)
         {
-            var filteredBooks = Books.Where(b =>
-                b.author.Equals(author, StringComparison.OrdinalIgnoreCase));
-
-            if (!filteredBooks.Any())
+            var books = await _bookService.GetBookByAuthor(author);
+            if (!books.Any())
             {
                 return NotFound(new ErrorResponse { Message = "There aren't any books written by this author" });
             }
-            return Ok(filteredBooks);
-           
+            return Ok(books);
         }
 
         /// <summary>
@@ -78,60 +75,81 @@ namespace BookProject.Controllers
         /// <response code="200">The book was found and return successfully.</response>
         /// <response code="404">Book with given ISBN was not found.</response>
         [HttpGet("isbn", Name = "GetBookByISBN")]
-        public ActionResult<IEnumerable<Book>> GetBookByISBN([FromQuery] String isbn)
+        public async Task<ActionResult<BookDTO>> GetBookByISBN([FromQuery] string isbn)
         {
-            var book = Books.FirstOrDefault(b => b.isbn.Equals(isbn, StringComparison.OrdinalIgnoreCase));
+            var book = await _bookService.GetBookByISBN(isbn);
             if (book == null)
             {
                 return NotFound(new ErrorResponse { Message = "Book with given ISBN not found" });
             };
             return Ok(book);
+
         }
 
         /// <summary>
         /// Add book to the list
         /// </summary>
         /// <param name="book">Book Object</param>
-        /// <response code="201">A book successfully created and added to the list.</response>
+        /// <response code="201">A book successfully created and added to the database.</response>
         /// <response code="400">The book object is not valid.</response>
-        /// <response code="409">Book with given ISBN is already in the list.</response>
+        /// <response code="409">Book with given ISBN is already in the database.</response>
         [HttpPost("add", Name = "AddBook")]
-        public ActionResult<Book> AddBook([FromBody] Book book)
+        public async Task<ActionResult> AddBook([FromBody] BookDTO bookDto)
         {
-            if (book == null)
+            try
             {
-                return BadRequest("Book can't be null");
+                await _bookService.AddBook(bookDto);
+                return CreatedAtRoute("GetBookByISBN", new { isbn = bookDto.ISBN }, new { message = "Book successfully added.", bookDto });
+
             }
-            // ISBN should be unique, check it first
-            var DuplicateBooks = Books.Where(b => b.isbn.Equals(book.isbn, StringComparison.OrdinalIgnoreCase));
-            
-            if (DuplicateBooks.Any())
+            catch (InvalidOperationException e)
             {
-                return Conflict(new ErrorResponse { Message = "A book with the same ISBN already exists" });
+                return Conflict(new ErrorResponse { Message = e.Message });
             }
-            
-            Books.Add(book);
-            return CreatedAtRoute("GetBookByISBN", new { isbn = book.isbn }, new { message = "Book successfully added." }); ;
         }
 
         /// <summary>
-        /// Delete a book from the list
+        /// Update a book from
         /// </summary>
-        /// <param name="isbn">Book ISBN</param>
-        /// <response code="200">A book successfully deleted from the list.</response>
-        /// <response code="404">Book with given ISBN was not found.</response>
-        [HttpDelete("delete/isbn", Name ="DeleteBook")]
-        public ActionResult<Object> DeleteBook([FromQuery] string isbn)
+        /// <param name="id">Book Id</param>
+        /// <response code="200">A book successfully updated.</response>
+        /// <response code="404">Book with given Id was not found.</response>
+        /// <response code="409">Book with given Id is already in the list.</response>
+        [HttpPut("edit/{id}", Name = "EditBook")]
+        public async Task<ActionResult> EditBook(Guid id, [FromBody] BookDTO bookDto)
         {
-            var book = Books.FirstOrDefault(b => b.isbn.Equals(isbn, StringComparison.OrdinalIgnoreCase));
-
-            if (book == null)
+            try
             {
-                return NotFound(new ErrorResponse { Message = "Book with given ISBN is not found." });
+                await _bookService.EditBook(id, bookDto);
+                return Ok(new { message = "Book successfully updated.", bookDto });
+            } 
+            catch (InvalidOperationException e)
+            {
+                return Conflict(new ErrorResponse { Message = e.Message });
             }
-            Books.Remove(book);
-            return Ok(new { message = "Book successfully deleted.", book });
+
         }
+
+        /// <summary>
+        /// Delete a book
+        /// </summary>
+        /// <param name="id">Book Id</param>
+        /// <response code="200">A book successfully deleted.</response>
+        /// <response code="404">Book with given Id was not found.</response>
+        [HttpDelete("delete/{id}", Name = "DeleteBook")]
+        public async Task<ActionResult> DeleteBook(Guid id)
+        {
+            var deletedBookDto = await _bookService.DeleteBook(id);
+
+            if (deletedBookDto == null)
+            {
+                return NotFound(new ErrorResponse { Message = "Book with given Id is not found." });
+            }
+
+            // Return the deleted book DTO
+            return Ok(new { message = "Book successfully deleted.", book = deletedBookDto });
+        }
+
     }
 
 }
